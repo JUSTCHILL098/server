@@ -8,12 +8,17 @@ app.use(cors());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: "https://weeb-delta.vercel.app", methods: ["GET", "POST"] }
+  cors: {
+    origin: "https://weeb-delta.vercel.app",
+    methods: ["GET", "POST"]
+  }
 });
 
 const rooms = new Map();
 
 io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
   socket.on("createRoom", ({ nickname }) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     socket.join(roomCode);
@@ -24,6 +29,7 @@ io.on("connection", (socket) => {
     };
     rooms.set(roomCode, roomData);
     socket.emit("roomCreated", roomData);
+    console.log(`Room created: ${roomCode}`);
   });
 
   socket.on("joinRoom", ({ roomCode, nickname }) => {
@@ -32,11 +38,7 @@ io.on("connection", (socket) => {
       socket.join(roomCode);
       const newUser = { id: socket.id, nickname: nickname || "Guest", isHost: false };
       room.members.push(newUser);
-      
-      // Tell the person joining they are IN
       socket.emit("roomJoined", { ...room, isHost: false });
-      
-      // Tell everyone else (the host) a new person is here
       io.to(roomCode).emit("userJoined", { members: room.members, nickname: newUser.nickname });
     } else {
       socket.emit("error", "Room not found");
@@ -53,7 +55,6 @@ io.on("connection", (socket) => {
       if (room) {
         const leavingUser = room.members.find(m => m.id === socket.id);
         room.members = room.members.filter(m => m.id !== socket.id);
-        
         if (room.members.length === 0) {
           rooms.delete(roomCode);
         } else {
@@ -67,8 +68,8 @@ io.on("connection", (socket) => {
   });
 });
 
+// THIS IS THE FIXED PART - DO NOT CHANGE
 const PORT = process.env.PORT || 3000;
-
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server is officially live on port ${PORT}`);
 });
