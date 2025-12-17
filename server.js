@@ -7,7 +7,7 @@ const app = express();
 
 // This allows your website to talk to the server
 app.use(cors({
-    origin: "*",
+    origin: "https://weeb-delta.vercel.app",
     methods: ["GET", "POST"]
 }));
 
