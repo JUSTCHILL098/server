@@ -6,10 +6,15 @@ import cors from "cors";
 const app = express();
 app.use(cors());
 
+// A simple home page so you know the server is alive
+app.get("/", (req, res) => {
+  res.send("Server is running! 🚀");
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "https://weeb-delta.vercel.app",
+    origin: "https://weeb-delta.vercel.app", // Allows any website to connect
     methods: ["GET", "POST"]
   }
 });
@@ -17,7 +22,7 @@ const io = new Server(httpServer, {
 const rooms = new Map();
 
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  console.log("User connected:", socket.id);
 
   socket.on("createRoom", ({ nickname }) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -29,7 +34,6 @@ io.on("connection", (socket) => {
     };
     rooms.set(roomCode, roomData);
     socket.emit("roomCreated", roomData);
-    console.log(`Room created: ${roomCode}`);
   });
 
   socket.on("joinRoom", ({ roomCode, nickname }) => {
@@ -46,6 +50,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("videoAction", (data) => {
+    // Sends play/pause to everyone else in the room
     socket.to(data.roomCode).emit("videoAction", data);
   });
 
@@ -53,23 +58,16 @@ io.on("connection", (socket) => {
     for (const roomCode of socket.rooms) {
       const room = rooms.get(roomCode);
       if (room) {
-        const leavingUser = room.members.find(m => m.id === socket.id);
         room.members = room.members.filter(m => m.id !== socket.id);
         if (room.members.length === 0) {
           rooms.delete(roomCode);
         } else {
-          io.to(roomCode).emit("userLeft", { 
-            members: room.members, 
-            nickname: leavingUser?.nickname || "Someone" 
-          });
+          io.to(roomCode).emit("userLeft", { members: room.members });
         }
       }
     }
   });
 });
 
-// THIS IS THE FIXED PART - DO NOT CHANGE
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server is officially live on port ${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
