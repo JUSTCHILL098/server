@@ -20,7 +20,7 @@ io.on("connection", (socket) => {
     const roomData = {
       roomCode,
       hostId: socket.id,
-      members: [{ id: socket.id, nickname, isHost: true }],
+      members: [{ id: socket.id, nickname: nickname || "Host", isHost: true }],
     };
     rooms.set(roomCode, roomData);
     socket.emit("roomCreated", roomData);
@@ -30,10 +30,16 @@ io.on("connection", (socket) => {
     const room = rooms.get(roomCode);
     if (room) {
       socket.join(roomCode);
-      const newUser = { id: socket.id, nickname, isHost: false };
+      const newUser = { id: socket.id, nickname: nickname || "Guest", isHost: false };
       room.members.push(newUser);
+      
+      // Tell the person joining they are IN
       socket.emit("roomJoined", { ...room, isHost: false });
-      io.to(roomCode).emit("userJoined", { members: room.members, nickname });
+      
+      // Tell everyone else (the host) a new person is here
+      io.to(roomCode).emit("userJoined", { members: room.members, nickname: newUser.nickname });
+    } else {
+      socket.emit("error", "Room not found");
     }
   });
 
@@ -41,23 +47,24 @@ io.on("connection", (socket) => {
     socket.to(data.roomCode).emit("videoAction", data);
   });
 
-  socket.on("changeEpisode", (data) => {
-    socket.to(data.roomCode).emit("changeEpisode", data);
-  });
-
   socket.on("disconnecting", () => {
     for (const roomCode of socket.rooms) {
       const room = rooms.get(roomCode);
       if (room) {
+        const leavingUser = room.members.find(m => m.id === socket.id);
         room.members = room.members.filter(m => m.id !== socket.id);
+        
         if (room.members.length === 0) {
           rooms.delete(roomCode);
         } else {
-          io.to(roomCode).emit("userLeft", { members: room.members });
+          io.to(roomCode).emit("userLeft", { 
+            members: room.members, 
+            nickname: leavingUser?.nickname || "Someone" 
+          });
         }
       }
     }
   });
 });
 
-httpServer.listen(3000, () => console.log("✅ Server Live on Port 3000"));
+httpServer.listen(3000, () => console.log("🚀 Server running on port 3000"));
